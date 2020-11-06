@@ -1,0 +1,263 @@
+{
+  "posts": [
+    {
+      "content": "1. UITableView 或 UICollectionView，点击没反应 或者 视图被遮挡\n> 原因: UITableView 或 UICollectionView的Cell视图层级改变，视图加载完成之后，contentView在Cell子视图的最上层，自己添加到Cell上的子控件被contentView遮挡\n\n> 更改：不要将控价直接添加到Cell上，要添加到Cell的contentView上面\n\n2. Xcode12打包上线后，iOS12上滑动UITableView 或 UICollectionView崩溃（自己运行找不到）\n> 原因：Xcode12打包上线后，iOS12上大面积崩溃，代码中 返回UITableViewCell 和 UICollectionViewCell的时候，判断最后返回了nil，\n> 还有一部分是向已经释放的对象（野指针）发送消息，主要原因 程序存在 内存泄漏(这个应该不算适配问题，自己写代码不注意的问题)\n\n> 依据：崩溃日志中：[Exception Type: EXC_BAD_ACCESS (SIGSEGV)](https://blog.csdn.net/dreamersharon/article/details/49561481)\n\n\n> 修改：通过Analyze静态分析，将所有可能造成泄漏的地方修改掉\n\n3. Xcode12 打包后，信号量崩溃\n> 原因：信号量使用不当，可能因为线程优先级，造成了内存问题\n> 修改：没有特别好的办法，去掉了信号量的使用\n\n4. Xcode12 编译第三方库失败\n> 报错：building for iOS Simulator, but linking in object file built for iOS\n> 原因：原来xcode12模拟器已经用arm架构来编译项目了，而link链接的还是x86架构\n> 修改：Target--Build Settings--VALID_ARCHS 中添加需要的架构\n            或将VALID_ARCHS删除掉（目前采取 去掉的方式）\n\n5.  私有库中使用.a 或者 .framework，cocoaPods lint失败\n  > 报错：Ld /Users/sjz/Library/Developer/Xcode/DerivedData/App-emljzuayowfblgduqgmiktqhgmzy/Build/Intermediates.noindex/App.build/Release-iphonesimulator/App.build/Objects-normal/i386/Binary/App normal i386\n> 相似问题：i386 换成 arm64 或者 armv7\n   \n> 修改：在podspace文件中添加：s.pod_target_xcconfig = { 'VALID_ARCHS' => 'x86_64 armv7 arm64'}\n> 还需要将：\n> Excluded Architecture 加上 arm64  （这个我承认，我没添加）\n> Build Active Architecture Only 设置为 NO\n\n6. 私有库中使用.a 或者 .framework，其他工程引入该私有库，正常运行，打包报错：\n```\nld: bitcode bundle could not be generated because '/Users/sjz/Desktop/workPlace/你的工程/Pods/私有库/Pods/BaiduMapKit/BaiduMapKit/BaiduMapAPI_Base.framework/BaiduMapAPI_Base(FontRenderer.o)' was built without full bitcode. All object files and libraries for bitcode must be generated from Xcode Archive or Install build file '/Users/sjz/Desktop/workPlace/你的工程/Pods/私有库/Pods/BaiduMapKit/BaiduMapKit/BaiduMapAPI_Base.framework/BaiduMapAPI_Base' for architecture armv7\n```\n> 分析\n> 1. bitcode bundle could not be generated was built without full bitcode.说明BaiduMapAPI_Base不支持开启bitcode\n> 2. 工程 和 私有库中 bitcode 已经全设置成 NO\n> 3. 打包还不成功\n> 4. 说明 私有库 中bitcode的开启受 有某些 依赖库 的影响\n\n解决方案：在工程的 podfile中添加（在私有库中添加，并没有起到作用）\n```\npost_install do |installer|\n  installer.pods_project.targets.each do |target|\n    target.build_configurations.each do |config|\n      config.build_settings['ENABLE_BITCODE'] = 'NO'\n    end\n  end\nend\n```\n\n\n\n   ",
+      "data": {
+        "title": "Xcode12 iOS14 适配",
+        "date": "2020-10-26 10:40:29",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "xcode12-ios14-gua-pei"
+    },
+    {
+      "content": "Product->Analyze ，静态分析警告\nUser-facing text should use localized string macro\n\n将 Build Settings -> Missing Localizability -> 设置为NO",
+      "data": {
+        "title": "iOS之\"User-facing text should use localized string macro”警告的解决",
+        "date": "2020-10-21 13:55:41",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "ios-zhi-user-facing-text-should-use-localized-string-macrojing-gao-de-jie-jue"
+    },
+    {
+      "content": "能正常真机测试，但build的时候会失败（红色警告）\n升级xcode12后，项目在run debug时候是正常运行的，但是在build或者run release的时候就会出现如标题的红色错误。\n\n在网上找到解决方法：\n\n在Target-Build Settings-Excluded Architectures中添加以下代码EXCLUDED_ARCHS__EFFECTIVE_PLATFORM_SUFFIX_simulator__NATIVE_ARCH_64_BIT_x86_64=arm64 arm64e armv7 armv7s armv6 armv8 EXCLUDED_ARCHS=$(inherited) $(EXCLUDED_ARCHS__EFFECTIVE_PLATFORM_SUFFIX_$(EFFECTIVE_PLATFORM_SUFFIX)__NATIVE_ARCH_64_BIT_$(NATIVE_ARCH_64_BIT))\n\n参考答案：https://cloud.tencent.com/developer/article/1704754\n\n相关回答： https://stackoverflow.com/questions/63607158/xcode-12-building-for-ios-simulator-but-linking-in-object-file-built-for-ios",
+      "data": {
+        "title": "linked library ‘libPods-xxx.a‘ is missing one or more architectures required by this target: armv7.",
+        "date": "2020-10-16 16:31:30",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "linked-library-libpods-xxxa-is-missing-one-or-more-architectures-required-by-this-target-armv7"
+    },
+    {
+      "content": "\n![](https://sjzlovecj.github.io//post-images/1602750924481.png)",
+      "data": {
+        "title": "iOS12:WKWebView修改user-agent遇到的重大bug",
+        "date": "2020-10-15 16:34:46",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "ios12wkwebview-xiu-gai-user-agent-yu-dao-de-chong-da-bug"
+    },
+    {
+      "content": "[NSPlaceholderMutableString initWithString:]: nil argument\n- 拼接字符串中有空字符串\n\n-[NSURLError objectForKey:]: unrecognized selector sent to instance 0x28153ad90\n- 这些需要类型判断，有些类型不能使用objectFotKey取值\n\n-[_NSInlineData objectForKeyedSubscript:]: unrecognized selector sent to instance 0x1c047be40 (null)\n- \n\n\n\n",
+      "data": {
+        "title": "iOS线上崩溃",
+        "date": "2020-10-15 14:13:16",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "ios-xian-shang-beng-kui"
+    },
+    {
+      "content": "在 podspec文件中添加：\n```\nvalid_archs = ['armv7s','arm64',]\ns.xcconfig = {\n  'VALID_ARCHS' =>  valid_archs.join(' '),\n}\ns.pod_target_xcconfig = {\n    'ARCHS[sdk=iphonesimulator*]' => '$(ARCHS_STANDARD_64_BIT)'\n}\n```\n指定支持的框架",
+      "data": {
+        "title": "cocoaPods symbol(s) not found for architecture i386",
+        "date": "2020-09-27 14:30:10",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "cocoapods-symbols-not-found-for-architecture-i386"
+    },
+    {
+      "content": "这是今天遇到的一个BUG,是在Debug下,\nbecause its architectures 'arm64' didn't contain all required architectures 'armv7 arm64'\n\n原因是cocoapods下依赖\n\n只要把Build Settings下的  Build Active Architecture Only  设置为YES就可以了\n\n## 可以解决  依赖第三方库 找不到头文件的问题\n\nBuild Active Architecture Only：是否只编译当前设备适用的指令集（如果这个参数设为YES，使用iPhone 6调试，那么最终生成的一个支持ARM64指令集的Binary。一般在DEBUG模式下设为YES，RELEASE设为NO）\n\n将Debug设置为YES,Release设置为NO。若两个都设置为YES上架打包用iPhone5s以上的手机编译发布包时不会支持iPhone5s以下的设备；用iPhone5以下的手机打包时的ipa包不包含64位。",
+      "data": {
+        "title": "because its architectures 'arm64' didn't contain all required architectures 'armv7 arm64'",
+        "date": "2020-09-22 13:51:52",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "because-its-architectures-arm64-didnt-contain-all-required-architectures-armv7-arm64"
+    },
+    {
+      "content": "- 什么是越狱\n    - 利用iOS漏洞，获取iOS系统的最高权限（Root），解开之前的各种限制（合法行为）\n\n- 越狱的好处\n    - 打造个性化、与众不同的iPhone\n        - 自由安装各种实用的插件、主题、APP\n        - 修改系统APP的一些默认行为\n\n    - 自由安装非AppSore来源的APP\n        - “付费APP”秒变“免费APP”\n        - 未越狱的iPhone安装APP的渠道\n            - appStore\n            - 真机调试\n            - 通过证书打包签名ipa安装\n        - 灵活管理文件系统，让iPhone可以像U盘那样灵活\n    - 给开发者提供了逆向工程的环境\n\n- 缺点\n    - 不保修\n    - 费电，越狱后的iOS系统会常驻一些进程，耗电速度约提升10%~20%\n    - 在新的iOS固件版本出来的时候，不能及时地进行更新\n        - 每个新版本的固件，都会修复上一个版本的越狱漏洞，使越狱失效\n        - 如果需要保持越狱状态，要等待新的预约程序发布时，才能升级相应的固件版本\n    - 不再受iOS系统默认的安全保护，容易被恶意软件攻击，个人隐私有被窃取的风险\n    - 如果安装了不稳定的插件，容易让系统变的不稳定、变慢，甚至出现白苹果等问题\n  \n### 完美预约和不完美越狱\n- 完美越狱\n    - 越狱后的iPhone可以正常关机 和 重启\n- 不完美预约\n    - iPhone一旦关机后再开机时，屏幕会一直停留在启动页面，也就是 白苹果 状态\n    - 或者能正常开机，但已经安装的破解软件都无法正常使用，需要将设备与pc连接后，使用软件进行引导才能使用\n- 一般来说，在苹果发布新的iOS固件后，针对改固件的不完美越狱会先发布，随后完美越狱才可能发布\n    - 一般较新的系统版本，均为不完美越狱\n- 越狱方法推荐\n    - PP助手\n\n- 如果判断手机越狱成功\n    - 桌面是否有Cydia\n    - 工具判断（PP助手）\n\n- Cydia安装软件的步骤\n    - 添加软件源（不同软件的软件源可能不同）\n    - 进入软件源找到对应的软件，开始安装\n- SpringBoard 就是iOS的桌面\n\n\n- 必备软件安装\n    - Apple File Conduit 2\n        - 可以访问整个iOS设备的文件系统\n        - 软件源：http",
+      "data": {
+        "title": "iOS 越狱",
+        "date": "2020-08-31 14:16:00",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "ios-yue-yu"
+    },
+    {
+      "content": "安装包（IPA）主要由可执行文件、资源组成\n\n- 资源（图片、音频、视频等）\n    - 采用无损压缩\n    - 去除没有用到的资源（LSUnusedResources）\n\n- 可执行文件瘦身\n    - 编译器优化\n        - Strip Linked Product、Make Strings Read-Only、Symbols Hidden by Default 设置为YES\n        - 去掉异常支持，Enable C++ Exceptions、Enable Objective-C Exceptions设置为NO，Other C Flags添加-fno-exceptions\n        - 利用AppCode 检测未使用的代码：菜单栏->Code->Inspect Code\n        - 编写LLVM插件检测出重复代码、未被调用的代码\n\n- LinkMap\n    - 生成LinkMap文件，可以查看可执行文件的具体组成",
+      "data": {
+        "title": "iOS安装包瘦身",
+        "date": "2020-08-27 10:00:41",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "ios-an-zhuang-bao-shou-shen"
+    },
+    {
+      "content": "### App的启动过程\n1. APP的启动分为两种\n    - 冷启动：从零开始启动APP\n    - 热启动：APP已经在内存中，在后台存活着，再次点击图标启动APP\n  <!-- more -->\n\n2. App的启动过程\n    - 解析info.plist\n        - 加载相关信息，例如闪屏\n        - 沙盒建立，权限检查\n    - Mach-O加载\n        - 如果是胖二进制文件，寻找合适当前CPU类别的部分\n        - 加载所有依赖的Mach-O文件（递归调用Mach-O加载的方法），进行rebase指针调整和bind符号绑定（dyld完成，运行时开始）\n        - 定位内部、外部指针引用，例如字符串、函数等\n        - 执行声明为`__attribute__((constructor))`的C函数\n        - 加载类扩展（Category）中的方法\n        - C++静态对象加载、调用ObjC的`+load`方法\n        - 进行各种objc结构的初始化（注册Objc类、初始化对象等等）\n        - 调用C++静态初始化器和__attribute__((constructor))装饰的函数\n    - 程序执行\n        - 调用`main()`\n        - 调用`UIApplicationMain()`\n        - 调用`application:didFinishLaunchingWithOptions:`\n\n3. 如何测量启动过程耗时\n    1.  main()函数之前\n        - 通过添加环境变量可以打印出APP的启动时间分析（Edit scheme -> Run -> Arguments）\n            - DYLD_PRINT_STATISTICS设置为1\n            - 如果需要更详细的信息，那就将DYLD_PRINT_STATISTICS_DETAILS设置为1\n        ```\n        Total pre-main time: 3.0 seconds (100.0%)\n                dylib loading time: 1.4 seconds (47.3%)\n                rebase/binding time: 297.30 milliseconds (9.7%)\n                    ObjC setup time: 245.42 milliseconds (8.0%)\n                initializer time: 1.0 seconds (34.9%)\n                slowest intializers :\n                    libSystem.B.dylib :  11.39 milliseconds (0.3%)\n                libglInterpose.dylib : 489.71 milliseconds (15.9%)\n                        AFNetworking : 318.57 milliseconds (10.3%)\n                        SJZCoreModule : 317.69 milliseconds (10.3%)\n                        LYEmptyView : 131.32 milliseconds (4.2%)\n        ```\n        如何解读\n        1). main()函数之前总共使用了3s\n        2). 在3s中，加载动态库用了1.4s，指针重定位使用了297.30ms，ObjC类初始化使用了245.42ms，各种初始化使用了1s。\n        3). 在初始化耗费的1s中，用时最多的五个初始化是libSystem.B.dylib、libglInterpose.dylib、AFNetworking、SJZCoreModule、LYEmptyView\n\n    2. main()函数之后\n        - 指的是从 main() 函数执行开始，到 appDelegate 的 didFinishLaunchingWithOptions 方法里首屏渲染相关方法执行完成。\n\n4. 影响启动性能的因素\n    每个库本身都有依赖关系，苹果公司建议使用更少的动态库，并建议在使用动态库的数量较多时，尽量将多个动态库进行合并。数量上，苹果公司最多可以支持6个非系统动态库合并为一个\n    +load()方法里的内容可以放到首屏渲染完成后再执行，或使用+initialize()方法替换掉。因为，在一个 +load() 方法里，进行运行时方法替换操作会带来 4 毫秒的消耗。不要小看这 4 毫秒，积少成多，执行 +load() 方法对启动速度的影响会越来越大。\n\n    - mian()函数之前耗时的影响因素\n        - 动态库加载越多，启动越慢\n        - ObjC类越多，启动越慢\n        - C的constructor函数越多，启动越慢\n        - ObjC的+load越多，启动越慢\n\n\n    > 优化\n    > 1. 减少动态库、合并一些动态库（定期清理不必要的动态库）\n    > 2. 减少Objc类、分类的数量、减少Selector数量（定期清理不必要的类、分类）\n    > 3. 合并功能类似的类和扩展（Category）\n    > 4. 减少C++虚函数数量\n    > 5. Swift尽量使用struct\n    > 6. 用+initialize方法和dispatch_once取代所有的__attribute__((constructor))、C++静态构造器、ObjC的+load方法\n    > 7. 压缩资源图片\n\n\n    - main() 函数之后耗时的影响因素\n        - 执行mian() 函数耗时\n        - 执行application:didFinishLaunchingWithOptions:耗时\n        - rootViewController及其childViewController的加载、view及其subviews的加载\n\n    ```\n    - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {\n        SJZTabBarController * tabBar = [[SJZTabBarController alloc] init];\n\n        ViewController * vc1 = [[ViewController alloc] init];\n        UINavigationController * nav1 = [[UINavigationController alloc] initWithRootViewController:vc1];\n        nav1.tabBarItem = [[UITabBarItem alloc] initWithTitle:@\"首页\" image:nil selectedImage:nil];\n        [tabBar addChildViewController:nav1];\n        \n        ViewController * vc2 = [[ViewController alloc] init];\n        UINavigationController * nav2 = [[UINavigationController alloc] initWithRootViewController:vc2];\n        nav2.tabBarItem = [[UITabBarItem alloc] initWithTitle:@\"首页\" image:nil selectedImage:nil];\n        [tabBar addChildViewController:nav2];\n        \n        \n        UIWindow * window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];\n        window.rootViewController = tabBar;\n        [window makeKeyAndVisible];\n        self.window = window;\n        \n        return YES;\n     }\n    ```\n    那么`[SJZTabBarController viewDidLoad]`  `[ViewController viewDidLoad]`  `[AppDelegate application: didFinishLaunchingWithOptions:]` 调用顺序是怎么样的？\n    > 执行顺序为：\n    > 1. didFinishLaunchingWithOptions 开始执行 \n    > 2. 开始加载 SJZTabBarController 的 viewDidLoad\n    >  3. didFinishLaunchingWithOptions 跑完了\n    >  4. 开始加载 ViewController 的 viewDidLoad, 然后执行一堆初始化的操作\n\n    但如果在didFinishLaunchingWithOptions执行期间，操作了ViewController的view 以及 subView（初始化好的）的话\n    > 执行顺序将变为:\n    > 1. didFinishLaunchingWithOptions 开始执行 \n    > 2. 开始加载 SJZTabBarController 的 viewDidLoad\n    > 3. 开始加载 ViewController 的 viewDidLoad, 然后执行一堆初始化的操作\n    > 4. didFinishLaunchingWithOptions 跑完了\n\n    如果将界面的初始化、网络请求、数据解析、视图渲染等操作都放到了viewDidLoad，每次启动APP的时候，在用户看到第一个页面之前，APP将执行完以上所有的操作，才会进入视图渲染阶段。\n\n    所以，main() 函数开始执行后到首屏渲染完成前只处理首屏相关的业务，其他非首屏业务的初始化、监听注册、配置文件读取等都放到首屏渲染完成后去做。\n    - 必要的配置信息，如埋点、日志等放到 didFinishLaunchingWithOptions中\n    - 初始化首页相关的代码，放到首页的viewDidLoad\n    - 其他与首页无关的SDK配置，网络请求，监听注册、配置文件读取等，放到首页viewDidAppear中\n\n    > 优化\n    > 1. 必须第一时间启动，仍然把它留在 didFinishLaunchingWithOptions 里启动。\n    > 2. 某些在用户进入APP主体之前必须要加载的功能，放到首页viewDidLoad 或 广告页的viewDidLoad\n    > 3. 非必须的，我们放到第一个界面的viewDidAppear\n\n### 优化的目标\n> 苹果给出的标准：\n> 应该在400ms内完成main()函数之前的加载\n> 整体过程耗时不能超过20秒，否则系统会kill掉进程，App启动失败\n\n这里要根据自己App的需求和规模，我们的目标应该有所取舍\n\n### 总结\n- 重新梳理架构，减少动态库（合并动态库）、ObjC类的数目，减少Category的数目\n- 定期扫描不再使用的动态库、类、函数\n- 用dispatchonce()代替所有的__attribute__((constructor))函数、C++静态对象初始化、ObjC的+load\n- 控制 C++ 全局变量的数量。\n- \n\n### 参考(其实大部分照抄😎)\n[iOS App 启动性能优化](https://mp.weixin.qq.com/s?__biz=MzA3NTYzODYzMg==&mid=2653579242&idx=1&sn=8f2313711f96a62e7a80d63851653639&chksm=84b3b5edb3c43cfb08e30f2affb1895e8bac8c5c433a50e74e18cda794dcc5bd53287ba69025&mpshare=1&scene=1&srcid=081075Vt9sYPaGgAWwb7xd1x&key=4b95006583a3cb388791057645bf19a825b73affa9d3c1303dbc0040c75548ef548be21acce6a577731a08112119a29dfa75505399bba67497ad729187c6a98469674924c7b447788c7370f6c2003fb4&ascene=0&uin=NDA2NTgwNjc1&devicetype=iMac16%2C2+OSX+OSX+10.12.6+build(16G29)&version=12020110&nettype=WIFI&fontScale=100&pass_ticket=IDZVtt6EyfPD9ZLcACRVJZYH8WaaMPtT%2BF3nfv7yZUQBCMKM4H1rDCbevGd7bXoG)\n[优化 App 的启动时间实践 iOS](https://www.jianshu.com/p/0858878e331f)\n\n\n\n\n\n\n\n\n\n\n\n\n",
+      "data": {
+        "title": "APP的启动时间优化",
+        "date": "2020-08-25 14:07:33",
+        "tags": [
+          "APP的启动"
+        ],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "### App的启动过程\n1. APP的启动分为两种\n    - 冷启动：从零开始启动APP\n    - 热启动：APP已经在内存中，在后台存活着，再次点击图标启动APP",
+      "fileName": "app-de-qi-dong-shi-jian"
+    },
+    {
+      "content": "- API：应用程序编程接口\n    - 源代码和库之间的接口\n\n- ABI：引用程序二进制接口\n    - 应用程序与操作系统之间的底层接口\n    - 涉及的内容有：目标文件格式、数据类型的大小、布局、对齐、函数调用约定等等\n\n",
+      "data": {
+        "title": "Swift基础",
+        "date": "2020-08-24 14:28:15",
+        "tags": [],
+        "published": true,
+        "hideInList": false,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "swift-ji-chu"
+    },
+    {
+      "content": "这是关于的页面，可以在这里向世界介绍你！\n",
+      "data": {
+        "title": "关于",
+        "date": "2019-01-25 19:09:48",
+        "tags": null,
+        "published": true,
+        "hideInList": true,
+        "feature": null,
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "",
+      "fileName": "about"
+    },
+    {
+      "content": "👏  欢迎使用 **Gridea** ！  \n✍️  **Gridea** 一个静态博客写作客户端。你可以用它来记录你的生活、心情、知识、笔记、创意... ... \n\n<!-- more -->\n\n[Github](https://github.com/getgridea/gridea)  \n[Gridea 主页](http://hvenotes.fehey.com/)  \n[示例网站](http://fehey.com/)\n\n## 特性👇\n📝  你可以使用最酷的 **Markdown** 语法，进行快速创作  \n\n🌉  你可以给文章配上精美的封面图和在文章任意位置插入图片  \n\n🏷️  你可以对文章进行标签分组  \n\n📋  你可以自定义菜单，甚至可以创建外部链接菜单  \n\n💻  你可以在 **𝖶𝗂𝗇𝖽𝗈𝗐𝗌** 或 **𝖬𝖺𝖼𝖮𝖲** 设备上使用此客户端  \n\n🌎  你可以使用 **𝖦𝗂𝗍𝗁𝗎𝖻 𝖯𝖺𝗀𝖾𝗌** 或 **Coding Pages** 向世界展示，未来将支持更多平台  \n\n💬  你可以进行简单的配置，接入 [Gitalk](https://github.com/gitalk/gitalk) 或 [DisqusJS](https://github.com/SukkaW/DisqusJS) 评论系统  \n\n🇬🇧  你可以使用**中文简体**或**英语**  \n\n🌁  你可以任意使用应用内默认主题或任意第三方主题，强大的主题自定义能力  \n\n🖥  你可以自定义源文件夹，利用 OneDrive、百度网盘、iCloud、Dropbox 等进行多设备同步  \n\n🌱 当然 **Gridea** 还很年轻，有很多不足，但请相信，它会不停向前🏃\n\n未来，它一定会成为你离不开的伙伴\n\n尽情发挥你的才华吧！\n\n😘 Enjoy~\n",
+      "data": {
+        "title": "Hello Gridea",
+        "date": "2018-12-12 00:00:00",
+        "tags": [
+          "Gridea"
+        ],
+        "published": true,
+        "hideInList": false,
+        "feature": "/post-images/hello-gridea.png",
+        "isTop": false
+      },
+      "isEmpty": false,
+      "excerpt": "",
+      "abstract": "👏  欢迎使用 **Gridea** ！  \n✍️  **Gridea** 一个静态博客写作客户端。你可以用它来记录你的生活、心情、知识、笔记、创意... ... ",
+      "fileName": "hello-gridea"
+    }
+  ],
+  "tags": [
+    {
+      "index": -1,
+      "name": "APP的启动",
+      "slug": "Ma4T4cJoZ",
+      "used": true
+    },
+    {
+      "name": "Gridea",
+      "slug": "gridea",
+      "used": true
+    },
+    {
+      "index": -1,
+      "name": "iOS直播",
+      "slug": "sI-aRh1FM",
+      "used": false
+    },
+    {
+      "index": -1,
+      "name": "Fluter",
+      "slug": "cQf-AIo_0",
+      "used": false
+    }
+  ],
+  "menus": [
+    {
+      "link": "/",
+      "name": "首页",
+      "openType": "Internal"
+    },
+    {
+      "link": "/archives",
+      "name": "归档",
+      "openType": "Internal"
+    },
+    {
+      "link": "/tags",
+      "name": "标签",
+      "openType": "Internal"
+    },
+    {
+      "link": "/post/about",
+      "name": "关于",
+      "openType": "Internal"
+    }
+  ]
+}
