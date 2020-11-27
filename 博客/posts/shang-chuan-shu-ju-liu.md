@@ -1,0 +1,80 @@
+---
+title: '上传数据流'
+date: 2020-11-26 14:14:16
+tags: []
+published: true
+hideInList: false
+feature: 
+isTop: false
+---
+## 概述
+流媒体应用程序和长时间运行的发送连续更新的应用程序使用持续流来上载数据，而不是发送单个数据块或平面文件。您可以配置URLSessionUploadTask实例（URLSessionTask的子类）以使用您提供的流，然后将数据无限期填充。该任务通过调用会话的代理来获取流，因此您需要创建一个会话并将自己的代码设置为其代理。
+
+## 创建URL会话
+首先创建一个URLSession并为其提供代理，清单1使用默认的URLSessionConfiguration创建一个URL会话，并将self设置为代理。您稍后将在“上传任务提供流”中实现URLSessionTaskDelegate。
+
+清单1 使用代理创建URLSession
+```
+lazy var session: URLSession = URLSession(configuration: .default,
+                                          delegate: self,
+                                          delegateQueue: .main)
+```
+## 创建流上传任务
+使用URLSession方法uploadTask(withStreamedRequest:)创建上传任务。这需要一个URLRequest，它指定要上传的URL以及其他参数。通过调用resume启动任务。清单2显示了如何创建和启动上传任务，连接到监听端口12345的本地计算机（127.0.0.1) 上的服务器。
+清单2 创建上传任务
+```
+let url = URL(string: "http://127.0.0.1:12345")!
+var request = URLRequest(url: url,
+                         cachePolicy: .reloadIgnoringLocalCacheData,
+                         timeoutInterval: 10)
+request.httpMethod = "POST"
+let uploadTask = session.uploadTask(withStreamedRequest: request)
+uploadTask.resume()
+```
+## 使用绑定的流对来提供输入流
+您将流数据作为inputStream提供给上传任务，任务从该流中读取数据并将其上传到目标。
+向输入流提供数据的一个好方法是使用一对绑定流。绑定对包含向其写入数据的OutputStream。由于流的绑定，您写入输出流的数据可用于输入流，然后任务可以从中读取数据，图1显示了这种安排。
+图1 使用一对编订的流向上传任务提供数据
+![](https://sjzlovecj.github.io//post-images/1606386222497.png)
+
+清单3 显示了一个名为Streams的结构，他由InputStream和OutputStreram组成。清单通过调用getBoundStreams(withBufferSize:inputStream:outputStream:)方法，为输入和输出流传入和传出引用，来穿件这种类型的属性，称为boundStreams。
+清单3 创建一对绑定的输入和输出流
+```
+struct Streams {
+    let input: InputStream
+    let output: OutputStream
+}
+lazy var boundStreams: Streams = {
+    var inputOrNil: InputStream? = nil
+    var outputOrNil: OutputStream? = nil
+    Stream.getBoundStreams(withBufferSize: 4096,
+                           inputStream: &inputOrNil,
+                           outputStream: &outputOrNil)
+    guard let input = inputOrNil, let output = outputOrNil else {
+        fatalError("On return of `getBoundStreams`, both `inputStream` and `outputStream` will contain non-nil streams.")
+    }
+    // configure and open output stream
+    output.delegate = self
+    output.schedule(in: .current, forMode: .default)
+    output.open()
+    return Streams(input: input, output: output)
+}()
+```
+创建绑定流对时，请确保指定一个缓冲区大小，以便在从输入流读取数据之前保存写入输出流的任何数据。清单3使用4096字节的缓冲。
+
+该列表还将self设置为输出流的代理，声明您的类实现了StreamDelegate协议，以便接受指示输出流何时准备接受新数据的事件。稍后，您将准备就绪时将数据写入流中提供StreamDelegate的实现。
+
+> 提示
+> 您的StreamDelegate和URLSessionTaskDelegate的实现可以在同一类中，也可以在不同的类中，以对您的应用架构更有意义的方式为准。
+
+## 为上传任务提供流
+您可以在URLSessionTaskDelegate方法urlSession（_：task：needNewBodyStream :)的实现中为上载任务提供输入流，在您通过调用resume（）启动上载任务后会调用该输入流。 回调传递一个完成处理程序，您可以直接调用它，传递您先前创建的boundStreams.input流。 清单4显示了此方法的实现。
+清单4 在委托回调中向上传任务提供输入流
+```
+func urlSession(_ session: URLSession, task: URLSessionTask,
+                needNewBodyStream completionHandler: @escaping (InputStream?) -> Void) {
+    completionHandler(boundStreams.input)
+}
+```
+
+## 准备好后将数据写入流
