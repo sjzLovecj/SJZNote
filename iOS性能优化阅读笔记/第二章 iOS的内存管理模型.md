@@ -1,12 +1,3 @@
----
-title: '第二章 iOS的内存管理模型'
-date: 2020-11-24 18:37:38
-tags: [iOS性能优化]
-published: true
-hideInList: false
-feature: 
-isTop: false
----
 ## 2.1 iOS的内存管理模型
 ### 2.1.1 关于内存消耗与引用计数
 当引用程序启动后，除了代码和系统数据会消耗一部分内存外，开发者在程序中创建的任何对象都会消耗内存。iOS程序中，内存通常被分成如下5个区域：
@@ -54,7 +45,8 @@ retain使对象的引用计数加1，当不再使用对象时，需要调用rele
     1. 被__unsafe_unretained修饰的变量仅提供弱引用，不会使其引用计数增加。变量如果是自己生成的，则会在离开作用域的时候被release一次，如果不是自己生成的，则在离开作用域后，不会进行release操作
     
 - __autoreleasing：这个修饰符与自动释放池有关
-    
+  
+
 ARC还需要牢记如下几条原则：
 1. 不能使用retain、release、autorelease函数，不可访问retainCount属性
 2. 不能调用dealloc函数，可以覆写dealloc函数，但在实现中不可调用父类的dealloc函数
